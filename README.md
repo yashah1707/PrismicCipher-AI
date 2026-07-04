@@ -104,7 +104,7 @@ Let's Now actually understand the logic behind this project and how truly the ba
 
 [MIT License](https://opensource.org/license/MIT)
 
-Copyright (c) 2024 Shourya Shah 
+Copyright (c) 2024 Yash Shah
 
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
