@@ -26,7 +26,7 @@ To install the PrismicCipherAI chatbot, please follow these steps:
 
 **1. Clone the repository to your local machine.**
 * Create a new folder in your vs code.
-* Then,Open your vs code terminal and paste ``` git clone https://github.com/shouryashah05/PrismicCipherAI.git ```
+* Then,Open your vs code terminal and paste ``` git clone (https://github.com/yashah1707/PrismicCipher-AI.git ```
 * Or else read the [Cloning a Github repo](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) document from github.
 
 
