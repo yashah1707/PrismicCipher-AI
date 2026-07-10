@@ -20,10 +20,13 @@ Upload PDFs -> build or load a vector index -> ask questions -> receive grounded
 
 ## Installation
 
-**1. Clone the repository to your local machine.**
-* Create a new folder in your vs code.
-* Then,Open your vs code terminal and paste ``` git clone https://github.com/yashah1707/PrismicCipher-AI.git ```
-* Or else read the [Cloning a Github repo](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) document from github.
+**1. Clone the repository to your local machine:**
+* Create a new folder in your VS Code workspace.
+* Open your VS Code terminal and run:
+  ```powershell
+  git clone https://github.com/yashah1707/PrismicCipher-AI.git
+  ```
+* Alternatively, refer to the [Cloning a GitHub repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide from GitHub.
 
 **2. Create and activate a virtual environment:**
 
@@ -47,7 +50,6 @@ ollama pull llama3.2
 ollama list
 ```
 
-
 Make sure Ollama is running before asking questions in the app.
 
 ## Run
@@ -64,6 +66,7 @@ Open the local Streamlit URL, upload one or more PDFs in the sidebar, click **Pr
 app.py                 Streamlit UI and session-state orchestration
 config.py              Tunable model, chunking, retrieval, and persistence constants
 htmlTemplates.py       Existing chat bubble CSS and avatar templates
+CHANGES.md             Summary of Tier 1 architectural modernization & bug fixes
 rag/
   loader.py            PDF byte reading, hashing, page extraction, metadata capture
   splitter.py          Recursive chunking with filename/page metadata retained
