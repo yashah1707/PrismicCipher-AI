@@ -1,126 +1,119 @@
-# **_PrismicCipherAI📑✨_**
+# PrismicCipherAI
 
-This project is a multi-PDF AI chatbot that enables seamless interaction with multiple PDFs. It is ideal for students, researchers, and professionals needing to manage large volumes of information. Additionally, the open-source nature of the project promotes transparency and encourages community-driven development.
+PrismicCipherAI is a local Retrieval-Augmented Generation (RAG) chatbot for asking questions across one or more uploaded PDFs. It uses Streamlit for the interface, FAISS and BM25 for retrieval, Hugging Face sentence-transformer embeddings, a local cross-encoder reranker, and Llama 3.2 through Ollama for answers.
 
-# Contents
--[Description](#Descripton)
+The app keeps the original flow:
 
--[How to Install and Run the Project](#How-to-Install-and-Run-the-Project)
+Upload PDFs -> build or load a vector index -> ask questions -> receive grounded answers with sources.
 
--[Usage and Explanation](#Usage-and-Explanation)
+## Features
 
--[License](#License)
+- Multi-PDF upload through Streamlit
+- Local embeddings with `sentence-transformers/all-MiniLM-L6-v2`
+- Persistent FAISS indexes keyed by uploaded file content hash
+- Hybrid retrieval using FAISS semantic search plus BM25 keyword search
+- MMR at the FAISS retrieval step to reduce duplicate chunks
+- Local reranking with `cross-encoder/ms-marco-MiniLM-L-6-v2`
+- Source attribution by PDF filename and page number
+- Streaming Ollama responses in the chat UI
+- Explicit prompt fallback when the uploaded documents do not contain the answer
 
-# Description 
-
-An AI-powered chatbot that enables seamless interaction with multiple PDFs, leveraging advanced technologies like Langchain, FAISS, and Llama 3.2 LLM. It extracts and analyzes document content efficiently, providing accurate responses to user queries. 
-
-The chatbot ensures privacy by processing data into vector embeddings without storing or using the actual document text. 
-
-PrismicCipherAI - The name reflects the values and ideation behind this project. _Prismic_ or simply _Prism_ signifies transparency and clarity existing within project. _Cipher_ means security and safety of user data
-
-
-# How to Insall and Run the Project
-
-To install the PrismicCipherAI chatbot, please follow these steps:
+## Installation
 
 **1. Clone the repository to your local machine.**
 * Create a new folder in your vs code.
 * Then,Open your vs code terminal and paste ``` git clone https://github.com/yashah1707/PrismicCipher-AI.git ```
 * Or else read the [Cloning a Github repo](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) document from github.
 
+**2. Create and activate a virtual environment:**
 
-  
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate
+```
 
-**2. Setting Up virtual Environment:**
-* We need to setup virtual environment for us to install dependencies and also able to run the web app.
-* To activate virtual environment, Open vs code terminal of your project directory and run ```python -m venv .venv``` for windows and ```python3 -m venv .venv``` for mac
-* After this run ```.venv\Scripts\Activate```
-  * If it shows any error to you while above step run this script-
-  
-    ```Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force;Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force;```.
+**3. Install dependencies:**
 
-    SKIP THESE IF NO ERROR IS FOUND AND VENV IS ACTIVATED
-  * And then run ```.venv\Scripts\Activate``` again
--Now, you have succesfully installed and setup virtual environment and you are ready to install dependencies
+```powershell
+pip install -r requirements.txt
+```
 
+## Ollama Setup
 
+Install Ollama from [ollama.com/download](https://ollama.com/download), then pull the local model:
 
-
-**3. Installing Dependencies:**
-* Open your vs code terminal and run this command to install all dependencies
-  
-     
-     ```pip install streamlit pypdf2 langchain python-dotenv faiss-cpu huggingface_hub```
-     
-     ```pip install InstructorEmbedding sentence_transformers```
-* Install [Ollama Setup](https://ollama.com/download) from Ollama official website
-* Now lets install llama 3.2 Model, Open command prompt on windows or terminal in mac and run ```ollama pull llama3.2``` and then run ```ollama list``` to check if installed correctly
-* Go back to vs code terminal and run ```pip install langchain langchain-ollama``` to finally run llama 3.2 model locally in your machine
-  * **OPTIONAL** - You will run Ollama LLM model locallly and it will be slow when generating response depending upon your gpu. You can also run Openai instead but it will be paid.
-    
-    * If you wish to use chatgpts Openai LLM you can do that by installing ```pip install openai langchain-openai``` and make changes in code by referring to [Langchain document](https://python.langchain.com/docs/integrations/llms/openai/) for openai
-    * If you dont wish to use llama 3.2 but dont want to pay openai either you can check out other LLM models on [Langchain 🦜🔗 documentation](https://python.langchain.com/docs/integrations/llms/) and [Huggingface 🤗 Documentation](https://huggingface.co/models?other=LLM)
+```powershell
+ollama pull llama3.2
+ollama list
+```
 
 
-# Usage and Explanation
+Make sure Ollama is running before asking questions in the app.
 
-Let's Now actually understand the logic behind this project and how truly the backend is working through theory and flowcharts. There are multiple steps involved in implementation let's understand them one by one:
+## Run
 
+```powershell
+streamlit run app.py
+```
 
-**1. PDF Upload and Text Extraction:**
+Open the local Streamlit URL, upload one or more PDFs in the sidebar, click **Process**, then ask questions in the chat input.
 
-   Users upload PDFs via a Streamlit interface, and the text is extracted using the PyPDF2 library. The extracted text is then divided into smaller chunks for easier processing, and tokenization is applied to prepare the text for further steps.
+## Project Architecture
 
+```text
+app.py                 Streamlit UI and session-state orchestration
+config.py              Tunable model, chunking, retrieval, and persistence constants
+htmlTemplates.py       Existing chat bubble CSS and avatar templates
+rag/
+  loader.py            PDF byte reading, hashing, page extraction, metadata capture
+  splitter.py          Recursive chunking with filename/page metadata retained
+  embeddings.py        Embedding model factory
+  vectorstore.py       FAISS build/load/save logic and chunk sidecar storage
+  retriever.py         Hybrid FAISS + BM25 retrieval and cross-encoder reranking
+  prompts.py           Contextualization and answer prompts
+  chain.py             LCEL-style history-aware retrieval and answer generation
+```
 
-**2. Vector Embedding and FAISS Storage:**
+## Retrieval Pipeline
 
-   The tokenized chunks are converted into vector embeddings using Sentence Transformers. These embeddings are stored in FAISS (Facebook AI Similarity Search), which efficiently indexes and stores vectors for fast similarity search.
-   
+1. PDF pages are extracted as LangChain `Document` objects with `filename` and `page` metadata.
+2. Pages are split with `RecursiveCharacterTextSplitter` using 1000-character chunks and 200-character overlap.
+3. FAISS stores semantic vectors generated by `sentence-transformers/all-MiniLM-L6-v2`.
+4. At question time, FAISS runs MMR search and BM25 runs keyword search.
+5. The two candidate sets are merged into 10 candidates.
+6. `cross-encoder/ms-marco-MiniLM-L-6-v2` reranks those candidates locally.
+7. The top 4 reranked chunks are sent to Llama 3.2 as final context.
 
-![4aa1b4b3-7838-4ae6-8961-26203e6f85ca](https://github.com/user-attachments/assets/34e878ae-5f1a-4fa8-9858-4804147c064b)
+The constants for candidate count, final context size, chunk size, overlap, and model names live in `config.py`.
 
-**3. Query Processing and Retrieval:**
-   
-   When a user submits a query, it is tokenized and converted into an embedding. FAISS then compares this query embedding with the stored document embeddings to retrieve the most relevant sections based on cosine similarity.
+## Hybrid Search
 
-   
-**4. Response Generation:**
+FAISS vector search is good at semantic matches and paraphrases. BM25 is good at exact terms such as names, codes, numbers, and section labels. Combining them improves recall before reranking chooses the best final context.
 
-   The relevant document sections are passed to Ollama Llama 3.2 LLM, which processes the retrieved content and generates contextually appropriate responses. The output is then decoded into human-readable text using T5 for natural language generation.
-   
-**5. Privacy Considerations:**
+## Reranking
 
-   At no point is raw document text stored, only vector embeddings are retained for document retrieval. This ensures that no sensitive data is exposed or used for training.
-   
-![fbdb8ef5-92bb-48a8-bc77-e08f9fc7ff46](https://github.com/user-attachments/assets/cda164c0-a72a-4006-9878-8655ea3af383)
+The cross-encoder compares the user question directly with each retrieved chunk. This is slower than vector search but much more precise, so it only runs on the top 10 hybrid candidates.
 
-**6. User Interface:**
-   
-   The entire system is integrated into a user-friendly Streamlit interface, where users can upload PDFs, enter queries, and view results effortlessly. This ensures that the system is easy to use, even for individuals with limited technical expertise.
+## Source Attribution
 
+Each chunk keeps its original PDF filename and page number. After an answer is generated, the app displays the sources used beneath the answer so users can verify where the response came from.
 
-# License
+## Streaming
 
-[MIT License](https://opensource.org/license/MIT)
+Ollama responses stream token-by-token into Streamlit. The total generation time is similar, but the answer starts appearing immediately instead of waiting for the full response.
 
-Copyright (c) 2024 Yash Shah
+## Persistent Vector Database
 
+Uploaded files are hashed by content. If the same file set is processed again, the app loads the saved FAISS index from `.vectorstore/<hash>/` instead of recomputing embeddings. The saved folder also includes a document sidecar used to rebuild the BM25 retriever.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+`.vectorstore/` is ignored by Git because it is generated local data.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## Notes
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+- The app runs locally, but the first run may download embedding and reranker models from Hugging Face.
+- If Ollama is not running or `llama3.2` is missing, document processing can still succeed, but answering questions will fail until Ollama is ready.
+- If a PDF has no extractable text, the app will warn instead of building an empty index.
+
+## License
+
+MIT License

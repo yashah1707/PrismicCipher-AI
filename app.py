@@ -1,147 +1,158 @@
 import streamlit as st
 from dotenv import load_dotenv
-from pypdf import PdfReader
 
-# Updated LangChain imports
-from langchain_text_splitters import CharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_ollama import ChatOllama
-
-from langchain_classic.memory import ConversationBufferMemory
-from langchain_classic.chains import ConversationalRetrievalChain
-
-from htmlTemplates import css, bot_template, user_template
+from config import APP_ICON, APP_TITLE
+from htmlTemplates import bot_template, css, user_template
+from rag.chain import build_rag_chain, to_langchain_history
+from rag.loader import hash_uploads, load_pdf_documents, read_uploaded_pdfs
+from rag.retriever import HybridRerankRetriever
+from rag.splitter import split_documents
+from rag.vectorstore import build_or_load_vectorstore
 
 
-def get_pdf_text(pdf_docs):
-    text = ""
-
-    for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text
-
-    return text
+def initialize_session_state() -> None:
+    if "rag_chain" not in st.session_state:
+        st.session_state.rag_chain = None
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "sources" not in st.session_state:
+        st.session_state.sources = []
 
 
-def get_text_chunks(text):
-    text_splitter = CharacterTextSplitter(
-        separator="\n",
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len,
+def render_chat_history() -> None:
+    for message in st.session_state.chat_history:
+        template = user_template if message["role"] == "user" else bot_template
+        st.write(template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True)
+
+
+def render_sources(sources) -> None:
+    if not sources:
+        return
+
+    seen: set[tuple[str, int | str]] = set()
+    unique_sources = []
+    for doc in sources:
+        filename = doc.metadata.get("filename", "Unknown file")
+        page = doc.metadata.get("page", "Unknown page")
+        key = (filename, page)
+        if key not in seen:
+            seen.add(key)
+            unique_sources.append(key)
+
+    if unique_sources:
+        st.caption("Sources")
+        for filename, page in unique_sources:
+            st.caption(f"{filename} - Page {page}")
+
+
+def process_documents(pdf_docs) -> None:
+    try:
+        uploads = read_uploaded_pdfs(pdf_docs)
+        content_hash = hash_uploads(uploads)
+        documents = load_pdf_documents(uploads)
+        chunks = split_documents(documents)
+
+        if not chunks:
+            raise ValueError("No text chunks could be created from the uploaded PDFs.")
+
+        vectorstore, saved_chunks, loaded_from_cache = build_or_load_vectorstore(
+            chunks=chunks,
+            content_hash=content_hash,
+        )
+    except RuntimeError as exc:
+        if "client has been closed" in str(exc):
+            raise RuntimeError(
+                "The embedding model could not be loaded from Hugging Face. "
+                "Check your internet connection, proxy/VPN settings, or pre-download "
+                "sentence-transformers/all-MiniLM-L6-v2 before processing PDFs."
+            ) from exc
+        raise
+
+    retriever = HybridRerankRetriever(
+        vectorstore=vectorstore,
+        documents=saved_chunks,
     )
+    st.session_state.rag_chain = build_rag_chain(retriever, streaming=True)
+    st.session_state.chat_history = []
+    st.session_state.sources = []
 
-    return text_splitter.split_text(text)
-
-
-def get_vectorstore(text_chunks):
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-    vectorstore = FAISS.from_texts(
-        texts=text_chunks,
-        embedding=embeddings
-    )
-
-    return vectorstore
+    if loaded_from_cache:
+        st.success("Existing vector database loaded successfully!")
+    else:
+        st.success("Documents processed successfully!")
 
 
-def get_conversation_chain(vectorstore):
-    llm = ChatOllama(
-        model="llama3.2",
-        temperature=0
-    )
+def handle_userinput(user_question: str) -> None:
+    if st.session_state.rag_chain is None:
+        st.warning("Please upload and process your PDFs first.")
+        return
 
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True
-    )
+    st.session_state.chat_history.append({"role": "user", "content": user_question})
+    st.write(user_template.replace("{{MSG}}", user_question), unsafe_allow_html=True)
 
-    conversation_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=vectorstore.as_retriever(),
-        memory=memory
-    )
+    history_messages = to_langchain_history(st.session_state.chat_history[:-1])
+    chain_input = {"input": user_question, "chat_history": history_messages}
 
-    return conversation_chain
+    answer_placeholder = st.empty()
+    answer = ""
+    sources = []
+
+    try:
+        for chunk in st.session_state.rag_chain.stream(chain_input):
+            if "context" in chunk:
+                sources = chunk["context"]
+            if "answer" in chunk:
+                answer += chunk["answer"]
+                answer_placeholder.write(
+                    bot_template.replace("{{MSG}}", answer),
+                    unsafe_allow_html=True,
+                )
+    except Exception as exc:
+        st.error(
+            "The local model could not generate a response. "
+            "Make sure Ollama is running and llama3.2 is installed."
+        )
+        st.exception(exc)
+        st.session_state.chat_history.pop()
+        return
+
+    st.session_state.chat_history.append({"role": "assistant", "content": answer})
+    st.session_state.sources = sources
+    render_sources(sources)
 
 
-def handle_userinput(user_question):
-    response = st.session_state.conversation.invoke(
-        {"question": user_question}
-    )
-
-    st.session_state.chat_history = response["chat_history"]
-
-    for i, message in enumerate(st.session_state.chat_history):
-        if i % 2 == 0:
-            st.write(
-                user_template.replace("{{MSG}}", message.content),
-                unsafe_allow_html=True,
-            )
-        else:
-            st.write(
-                bot_template.replace("{{MSG}}", message.content),
-                unsafe_allow_html=True,
-            )
-
-
-def main():
+def main() -> None:
     load_dotenv()
 
-    st.set_page_config(
-        page_title="PrismicCipherAI",
-        page_icon="✨"
-    )
-
+    st.set_page_config(page_title=APP_TITLE, page_icon=APP_ICON)
     st.write(css, unsafe_allow_html=True)
-
-    if "conversation" not in st.session_state:
-        st.session_state.conversation = None
-
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = None
+    initialize_session_state()
 
     st.header("PrismicCipherAI - Chat with Multiple PDFs 📑")
 
-    user_question = st.text_input(
-        "Ask a question about your documents:"
-    )
+    render_chat_history()
 
+    user_question = st.text_input("Ask a question about your documents:")
     if user_question:
-        if st.session_state.conversation is None:
-            st.warning("Please upload and process your PDFs first.")
-        else:
-            handle_userinput(user_question)
+        handle_userinput(user_question)
 
     with st.sidebar:
         st.subheader("Your Documents")
 
-        pdf_docs = st.file_uploader(
-            "Upload PDFs",
-            accept_multiple_files=True
-        )
+        pdf_docs = st.file_uploader("Upload PDFs", accept_multiple_files=True)
 
         if st.button("Process"):
             if not pdf_docs:
                 st.warning("Please upload at least one PDF.")
             else:
                 with st.spinner("Processing..."):
-                    raw_text = get_pdf_text(pdf_docs)
-                    text_chunks = get_text_chunks(raw_text)
-                    vectorstore = get_vectorstore(text_chunks)
-
-                    st.session_state.conversation = get_conversation_chain(
-                        vectorstore
-                    )
-
-                st.success("Documents processed successfully!")
+                    try:
+                        process_documents(pdf_docs)
+                    except ValueError as exc:
+                        st.warning(str(exc))
+                    except Exception as exc:
+                        st.error("Unable to process the uploaded PDFs.")
+                        st.exception(exc)
 
 
 if __name__ == "__main__":
