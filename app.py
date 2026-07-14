@@ -1,10 +1,14 @@
+import importlib
 import streamlit as st
 from dotenv import load_dotenv
 
 from config import APP_ICON, APP_TITLE
 from htmlTemplates import bot_template, css, user_template
 from rag.chain import build_rag_chain, to_langchain_history
-from rag.loader import hash_uploads, load_pdf_documents, read_uploaded_pdfs
+import rag.loader
+import rag.vectorstore
+import rag.retriever
+from rag.loader import hash_uploads, load_pdf_documents, read_uploaded_pdfs, sanitize_text
 from rag.retriever import HybridRerankRetriever
 from rag.splitter import split_documents
 from rag.vectorstore import build_or_load_vectorstore
@@ -47,6 +51,10 @@ def render_sources(sources) -> None:
 
 def process_documents(pdf_docs) -> None:
     try:
+        importlib.reload(rag.loader)
+        importlib.reload(rag.vectorstore)
+        importlib.reload(rag.retriever)
+
         uploads = read_uploaded_pdfs(pdf_docs)
         content_hash = hash_uploads(uploads)
         documents = load_pdf_documents(uploads)
@@ -54,6 +62,10 @@ def process_documents(pdf_docs) -> None:
 
         if not chunks:
             raise ValueError("No text chunks could be created from the uploaded PDFs.")
+
+        for chunk in chunks:
+            if hasattr(chunk, "page_content"):
+                chunk.page_content = sanitize_text(chunk.page_content)
 
         vectorstore, saved_chunks, loaded_from_cache = build_or_load_vectorstore(
             chunks=chunks,

@@ -10,6 +10,7 @@ from pydantic import ConfigDict, Field
 from sentence_transformers import CrossEncoder
 
 from config import ENSEMBLE_TOP_K, FAISS_FETCH_K, FINAL_CONTEXT_CHUNKS, RERANKER_MODEL
+from rag.loader import sanitize_text
 
 
 @lru_cache(maxsize=4)
@@ -33,6 +34,7 @@ class HybridRerankRetriever(BaseRetriever):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _get_relevant_documents(self, query: str) -> list[Document]:
+        query = sanitize_text(query)
         if not self.documents:
             return []
 

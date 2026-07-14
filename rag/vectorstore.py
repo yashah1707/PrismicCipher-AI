@@ -8,6 +8,7 @@ from langchain_community.vectorstores import FAISS
 
 from config import VECTORSTORE_DIR
 from rag.embeddings import get_embeddings
+from rag.loader import sanitize_text
 
 DOCSTORE_FILE = "documents.json"
 
@@ -37,6 +38,9 @@ def build_or_load_vectorstore(
         )
         return vectorstore, load_saved_documents(path), True
 
+    for doc in chunks:
+        doc.page_content = sanitize_text(doc.page_content)
+
     path.mkdir(parents=True, exist_ok=True)
     vectorstore = FAISS.from_documents(chunks, embeddings)
     vectorstore.save_local(str(path))
@@ -55,6 +59,6 @@ def save_documents(path: Path, documents: list[Document]) -> None:
 def load_saved_documents(path: Path) -> list[Document]:
     payload = json.loads((path / DOCSTORE_FILE).read_text(encoding="utf-8"))
     return [
-        Document(page_content=item["page_content"], metadata=item.get("metadata", {}))
+        Document(page_content=sanitize_text(item["page_content"]), metadata=item.get("metadata", {}))
         for item in payload
     ]
