@@ -1,6 +1,6 @@
 # PrismicCipherAI
 
-PrismicCipherAI is a local Retrieval-Augmented Generation (RAG) chatbot for asking questions across one or more uploaded PDFs. It uses Streamlit for the interface, FAISS and BM25 for retrieval, Hugging Face sentence-transformer embeddings, a local cross-encoder reranker, and Llama 3.2 through Ollama for answers.
+PrismicCipherAI is a Retrieval-Augmented Generation (RAG) chatbot for asking questions across one or more uploaded PDFs. It uses Streamlit for the interface, FAISS and BM25 for retrieval, Hugging Face sentence-transformer embeddings, a local cross-encoder reranker, and Gemini for answers.
 
 The app keeps the original flow:
 
@@ -15,7 +15,7 @@ Upload PDFs -> build or load a vector index -> ask questions -> receive grounded
 - MMR at the FAISS retrieval step to reduce duplicate chunks
 - Local reranking with `cross-encoder/ms-marco-MiniLM-L-6-v2`
 - Source attribution by PDF filename and page number
-- Streaming Ollama responses in the chat UI
+- Streaming Gemini responses in the chat UI
 - Explicit prompt fallback when the uploaded documents do not contain the answer
 
 ## Installation
@@ -41,16 +41,15 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Ollama Setup
+## Gemini Setup
 
-Install Ollama from [ollama.com/download](https://ollama.com/download), then pull the local model:
+Create a Gemini API key in Google AI Studio and add it to a `.env` file at the project root as `GOOGLE_API_KEY`.
 
 ```powershell
-ollama pull llama3.2
-ollama list
+GOOGLE_API_KEY=your-api-key
 ```
 
-Make sure Ollama is running before asking questions in the app.
+Restart your terminal or VS Code after updating the environment file.
 
 ## Run
 
@@ -85,7 +84,7 @@ rag/
 4. At question time, FAISS runs MMR search and BM25 runs keyword search.
 5. The two candidate sets are merged into 10 candidates.
 6. `cross-encoder/ms-marco-MiniLM-L-6-v2` reranks those candidates locally.
-7. The top 4 reranked chunks are sent to Llama 3.2 as final context.
+7. The top 4 reranked chunks are sent to Gemini as final context.
 
 The constants for candidate count, final context size, chunk size, overlap, and model names live in `config.py`.
 
@@ -103,7 +102,7 @@ Each chunk keeps its original PDF filename and page number. After an answer is g
 
 ## Streaming
 
-Ollama responses stream token-by-token into Streamlit. The total generation time is similar, but the answer starts appearing immediately instead of waiting for the full response.
+Gemini responses stream token-by-token into Streamlit. The total generation time is similar, but the answer starts appearing immediately instead of waiting for the full response.
 
 ## Persistent Vector Database
 
@@ -114,7 +113,7 @@ Uploaded files are hashed by content. If the same file set is processed again, t
 ## Notes
 
 - The app runs locally, but the first run may download embedding and reranker models from Hugging Face.
-- If Ollama is not running or `llama3.2` is missing, document processing can still succeed, but answering questions will fail until Ollama is ready.
+- If `GOOGLE_API_KEY` is missing, document processing can still succeed, but answering questions will stop until the key is configured.
 - If a PDF has no extractable text, the app will warn instead of building an empty index.
 
 ## License

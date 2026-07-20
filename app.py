@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -87,6 +89,10 @@ def handle_userinput(user_question: str) -> None:
         st.warning("Please upload and process your PDFs first.")
         return
 
+    if not os.getenv("GOOGLE_API_KEY"):
+        st.error("Set GOOGLE_API_KEY in your environment before asking questions.")
+        return
+
     st.session_state.chat_history.append({"role": "user", "content": user_question})
     st.write(user_template.replace("{{MSG}}", user_question), unsafe_allow_html=True)
 
@@ -109,8 +115,8 @@ def handle_userinput(user_question: str) -> None:
                 )
     except Exception as exc:
         st.error(
-            "The local model could not generate a response. "
-            "Make sure Ollama is running and llama3.2 is installed."
+            "The Gemini model could not generate a response. "
+            "Check your GOOGLE_API_KEY, network access, and Gemini API quota."
         )
         st.exception(exc)
         st.session_state.chat_history.pop()

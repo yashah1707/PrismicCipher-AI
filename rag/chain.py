@@ -6,18 +6,25 @@ from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain_ollama import ChatOllama
+from langchain_google_genai import ChatGoogleGenerativeAI
 
-from config import LLM_MODEL
+from config import GEMINI_MODEL
 from rag.prompts import contextualize_prompt, qa_prompt
 from rag.retriever import HybridRerankRetriever
 
 
-def create_llm(streaming: bool = False) -> ChatOllama:
-    return ChatOllama(model=LLM_MODEL, temperature=0, streaming=streaming)
+def create_llm(streaming: bool = False) -> ChatGoogleGenerativeAI:
+    return ChatGoogleGenerativeAI(
+        model=GEMINI_MODEL,
+        temperature=0,
+        streaming=streaming,
+    )
 
 
-def create_history_aware_retriever(llm: ChatOllama, retriever: HybridRerankRetriever):
+def create_history_aware_retriever(
+    llm: ChatGoogleGenerativeAI,
+    retriever: HybridRerankRetriever,
+):
     """LCEL history-aware retriever equivalent for LangChain 1.x."""
 
     def retrieve(inputs: dict) -> list[Document]:
@@ -36,7 +43,7 @@ def create_history_aware_retriever(llm: ChatOllama, retriever: HybridRerankRetri
     return RunnableLambda(retrieve)
 
 
-def create_retrieval_chain(history_aware_retriever, llm: ChatOllama):
+def create_retrieval_chain(history_aware_retriever, llm: ChatGoogleGenerativeAI):
     """LCEL retrieval chain that returns answer text plus source documents."""
 
     def format_context(inputs: dict) -> str:

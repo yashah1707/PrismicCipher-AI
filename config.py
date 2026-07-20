@@ -4,7 +4,7 @@ from pathlib import Path
 APP_TITLE = "PrismicCipherAI"
 APP_ICON = "✨"
 
-LLM_MODEL = "llama3.2"
+GEMINI_MODEL = "gemini-1.5-flash"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 

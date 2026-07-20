@@ -22,14 +22,14 @@ This document summarizes every major architectural modernization and cleanup cha
 
 ### 4. Cross-Encoder Reranking (10 Candidates → Top 4)
 - **Change**: Introduced a local cross-encoder model (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to rerank the top 10 merged candidates from the hybrid search down to the top 4 most relevant chunks before passing them to the LLM.
-- **Why it improves the project**: While bi-encoder vector embeddings (`sentence-transformers/all-MiniLM-L6-v2`) are fast for initial candidate retrieval, cross-encoders score the exact interaction between the query string and chunk text simultaneously. Reranking dramatically increases precision and reduces hallucination risk by ensuring only the highest-quality context reaches the context window of Llama 3.2.
+- **Why it improves the project**: While bi-encoder vector embeddings (`sentence-transformers/all-MiniLM-L6-v2`) are fast for initial candidate retrieval, cross-encoders score the exact interaction between the query string and chunk text simultaneously. Reranking dramatically increases precision and reduces hallucination risk by ensuring only the highest-quality context reaches the context window of Gemini.
 
 ### 5. Source Attribution via Filename and Page Metadata
 - **Change**: Enhanced document loading (`rag/loader.py`) and splitting (`rag/splitter.py`) to extract and preserve exact source metadata (`filename` and `page`) for every extracted chunk.
 - **Why it improves the project**: Users can trace every fact or statement in the chatbot's answers back to the specific uploaded PDF and exact page number. This transparency builds trust and makes the chatbot practical for research and compliance verification.
 
 ### 6. Explicit "I Don't Know" Grounding Instruction in Prompts
-- **Change**: Updated the answering prompt template (`rag/prompts.py`) to explicitly instruct the model (`Llama 3.2` via `Ollama`) to answer strictly based on the retrieved context, and to explicitly state when the answer cannot be found in the context.
+- **Change**: Updated the answering prompt template (`rag/prompts.py`) to explicitly instruct the model (`Gemini`) to answer strictly based on the retrieved context, and to explicitly state when the answer cannot be found in the context.
 - **Why it improves the project**: Prevents the LLM from relying on prior training data or hallucinating answers when the uploaded documents do not contain the requested information.
 
 ### 7. Persistent Vector Storage Keyed by Content Hash
@@ -37,7 +37,7 @@ This document summarizes every major architectural modernization and cleanup cha
 - **Why it improves the project**: Eliminates the overhead of re-reading and re-embedding large PDFs across sessions or restarts when the user uploads identical documents.
 
 ### 8. Streaming Responses
-- **Change**: Configured `ChatOllama` for real-time token-by-token streaming right into the Streamlit chat interface (`app.py`).
+- **Change**: Configured Gemini for real-time token-by-token streaming right into the Streamlit chat interface (`app.py`).
 - **Why it improves the project**: Significantly improves perceived latency. Instead of waiting several seconds for the entire response to finish generating, users receive immediate visual feedback as the answer is formed.
 
 ---
